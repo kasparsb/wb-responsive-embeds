@@ -14,28 +14,43 @@ class Plugin extends Base {
     }
 
     public function the_content($content) {
-        $items = $this->find_iframes($content);
-        
-        foreach ($items as $iframe) {
-            $content = str_replace($iframe, $this->handle_iframe($iframe), $content);
+        $safe = 0;
+
+        $p = 0;
+
+        while ($iframe = $this->find_iframe($content, $p)) {
+            $wraped_iframe = $this->handle_iframe($iframe->content);
+
+            $content = substr($content, 0, $iframe->start).$wraped_iframe.substr($content, $iframe->end);
+
+            $p = $iframe->start + strlen($wraped_iframe);
+
+            if ($safe++ > 100) {
+                break;
+            }
         }
 
-        return (count($items) > 0 ? $this->css() : '').$content;
+        return ($p > 0 ? $this->css() : '').$content;
     }
 
-    public function find_iframes($content) {        
-        $r = [];
-
-        $pos = strpos($content, '<iframe');
-        while ($pos !== false) {
+    public function find_iframe($content, $startPos=0) {
+        $pos = strpos($content, '<iframe', $startPos);
+        if ($pos !== false) {
             $pos2 = strpos($content, '</iframe>', $pos);
 
-            $r[] = substr($content, $pos, ($pos2+9) - $pos);
+            if ($pos2 !== false) {
+                $pos2 += 9;
 
-            $pos = strpos($content, '<iframe', $pos2);
+                return (object)[
+                    'start' => $pos,
+                    'end' => $pos2,
+                    'length' => $pos2 - $pos,
+                    'content' => substr($content, $pos, $pos2 - $pos)
+                ];    
+            }
         }
 
-        return $r;
+        return false;
     }
 
     public function handle_iframe($embed) {
